@@ -20,16 +20,8 @@ def theo_sigma(w, k, r, D, g):
     return D * sigma / tt
 
 @njit
-def tmp_factor(w, k, r, D, g1, g2, h1, h2):
-    mu1 = theo_mean(w, k, r, g1, h1)
-    mu2 = theo_mean(w, k, r, g2, h2)
-    sigma1 = theo_sigma(w, k, r, D, g1)
-    sigma2 = theo_sigma(w, k, r, D, g2)
-    
-    return (mu1-mu2).T @ np.linalg.inv(sigma2) @ (mu1 - mu2)
-
-@njit
 def kl(w, k, r, D, g1, g2, h1, h2):
+    ### Compute the KL divergence between two Gaussian distributions
     mu1 = theo_mean(w, k, r, g1, h1)
     mu2 = theo_mean(w, k, r, g2, h2)
     sigma1 = theo_sigma(w, k, r, D, g1)
@@ -37,14 +29,22 @@ def kl(w, k, r, D, g1, g2, h1, h2):
     sigma2_inv = np.linalg.inv(sigma2)
     
     sum1 = (mu1-mu2).T @ sigma2_inv @ (mu1 - mu2)
-    sum2 = np.trace(sigma2_inv @ sigma1) - np.log(np.linalg.det(sigma1)/np.linalg.det(sigma2)) -2
+    sum2 = np.trace(sigma2_inv @ sigma1) - np.log(np.linalg.det(sigma1)/np.linalg.det(sigma2)) - sigma1.shape[0]
     
     return 0.5 * (sum1 + sum2)
 
 @njit
-def ch(w, k, h1, h2):
-    #TODO
-    return tmp_factor(w, k, r, D, h1, h2) / 8
+def ch(w, k, r, D, g1, g2, h1, h2, alpha=0.5):
+    ### Compute the Chernoff divergence between two Gaussian distributions
+    mu1 = theo_mean(w, k, r, g1, h1)
+    mu2 = theo_mean(w, k, r, g2, h2)
+    sigma1 = theo_sigma(w, k, r, D, g1)
+    sigma2 = theo_sigma(w, k, r, D, g2)
+    
+    sum1 = (1-alpha) * alpha * (mu1-mu2).T @ np.linalg.inv((1-alpha)*sigma1 + alpha*sigma2) @ (mu1 - mu2)
+    sum2 = np.log( np.linalg.det((1-alpha)*sigma1 + alpha*sigma2) / np.linalg.det(sigma1)**(1-alpha) / np.linalg.det(sigma2)**alpha )
+
+    return 0.5 * (sum1 + sum2)
 
 def theo_lb(w, k, r, D, pi, gs, hs):
     n_inputs = len(pi)
@@ -53,7 +53,7 @@ def theo_lb(w, k, r, D, pi, gs, hs):
     for idx_i in range(n_inputs):
         tmp = 0
         for idx_j in range(n_inputs):
-            tmp += pi[idx_j] * np.exp( -ch(w, k, r, D, hs[:,idx_i],hs[:,idx_j]) )
+            tmp += pi[idx_j] * np.exp( -ch(w, k, r, D, gs[idx_i], gs[idx_j], hs[:,idx_i], hs[:,idx_j]) )
         ress += pi[idx_i] * np.log( tmp )
     return - ress
 
