@@ -8,16 +8,38 @@ def theo_mean(w, k, r, g, h):
 
     xplus = (h[0]*r + g*w*k*(h[0]-h[1])) / beta
     xminus = (h[1]*(r-g*w) + g*w*h[0]) / beta
+    
     return np.array( [xplus, xminus] )
 
 @njit
 def theo_sigma(w, k, r, D, g):
     ### Compute expected covariance matrix
     tt = r*(r+g*w*(k-1))*(2*r+g*w*(k-1))
+    
     sigma = np.array([[2*r**2+(-1+3*k)*g*w*r+2*g**2*k**2*w**2, g*w*(r-k*r+2*g*k*w)],
                       [g*w*(r-k*r+2*g*k*w), 2*r**2+(k-3)*g*r*w+2*g**2*w**2]])
     
     return D * sigma / tt
+
+@njit
+def theo_mean_multiple(w, k, r, gs, h):
+    n = np.size(gs)
+    means = np.zeros((n, 2, 2))
+    
+    for idx in range(n):
+        means[idx] = theo_mean(w, k, r, gs[idx], h)
+    
+    return means
+
+@njit
+def theo_sigma_multiple(w, k, r, D, gs):
+    n = np.size(gs)
+    sigmas = np.zeros((n, 2, 2))
+    
+    for idx in range(n):
+        sigmas[idx] = theo_sigma(w, k, r, D, gs[idx])
+    
+    return sigmas
 
 @njit
 def kl(w, k, r, D, g1, g2, h1, h2):
